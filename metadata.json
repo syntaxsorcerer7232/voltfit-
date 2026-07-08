@@ -1,0 +1,6 @@
+{
+  "name": "VoltFit",
+  "description": "VoltFit is a comprehensive fitness and workout tracking application designed for strength training, with community features, workout logging, and progress reporting.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

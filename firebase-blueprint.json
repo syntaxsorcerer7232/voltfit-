@@ -1,0 +1,69 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with gamification and full fitness state",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "points": { "type": "number" },
+        "badges": { "type": "array" },
+        "gender": { "type": "string" },
+        "dateOfBirth": { "type": "string" },
+        "mobile": { "type": "string" },
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "bodyType": { "type": "string" },
+        "allergies": { "type": "array" },
+        "dietPreference": { "type": "string" },
+        "workoutPreference": { "type": "string" },
+        "workoutFrequency": { "type": "string" },
+        "goal": { "type": "string" },
+        "goalSpeed": { "type": "string" },
+        "calorieGoal": { "type": "number" },
+        "maintainCalories": { "type": "number" },
+        "proteinGoal": { "type": "number" },
+        "carbsGoal": { "type": "number" },
+        "fatsGoal": { "type": "number" },
+        "waterIntakeGoal": { "type": "number" },
+        "bio": { "type": "string" },
+        "profilePicture": { "type": "string" },
+        "streak": { "type": "number" },
+        "macros": { "type": "object" },
+        "goals": { "type": "object" },
+        "biometricEnabled": { "type": "boolean" },
+        "habits": { "type": "array" },
+        "workoutHistory": { "type": "array" },
+        "workoutSchedule": { "type": "object" },
+        "meals": { "type": "array" },
+        "waterIntake": { "type": "array" },
+        "dailySteps": { "type": "number" },
+        "workoutDiary": { "type": "array" }
+      },
+      "required": ["name", "email", "points"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and state"
+    },
+    "public_profiles/{userId}": {
+      "schema": "User",
+      "description": "Publicly accessible user profiles for social features"
+    },
+    "mentorships/{id}": {
+      "description": "Mentorship requests and statuses"
+    },
+    "tips/{tipId}": {
+      "description": "Community nutrition and fitness tips"
+    },
+    "challenges/{docId}": {
+      "description": "Global fitness challenges"
+    },
+    "community_questions/{id}": {
+      "description": "Expert Q&A collection"
+    }
+  }
+}

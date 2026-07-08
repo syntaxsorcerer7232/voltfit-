@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #84cc16;
+  --color-primary-dark: #65a30d;
+  --color-secondary: #38bdf8;
+  --color-accent-alert: #f59e0b;
+  --color-accent-danger: #ef4444;
+  --color-surface-elevated: var(--surface-elevated);
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+}
+
+:root {
+  --bg: #020617;
+  --fg: #f1f5f9;
+  --card: rgba(15, 23, 42, 0.8);
+  --card-border: rgba(30, 41, 59, 0.5);
+  --surface-elevated: #1e293b;
+  --muted: #94a3b8;
+}
+
+.light {
+  --bg: #f8fafc;
+  --fg: #0f172a;
+  --card: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(226, 232, 240, 0.8);
+  --surface-elevated: #ffffff;
+  --muted: #64748b;
+}
+
+@layer utilities {
+  .text-muted {
+    color: var(--muted);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .glass-card {
+    background: var(--card);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--card-border);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 1rem);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .bottom-safe {
+    bottom: env(safe-area-inset-bottom, 1rem);
+  }
+  .h-safe-bottom {
+    height: env(safe-area-inset-bottom, 0px);
+  }
+  .shader-bg {
+    @apply bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-from),_transparent_80%)] from-primary/15;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: 'Outfit', ui-sans-serif, system-ui, sans-serif;
+  @apply selection:bg-primary/30 selection:text-primary transition-colors duration-300;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Light mode overrides */
+.light body {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+.light .glass-card {
+  background: var(--card);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+}
+
+body.barcode-scanner-active {
+  background-color: transparent !important;
+}
+
+body.barcode-scanner-active #root {
+  background-color: transparent !important;
+  opacity: 0.9;
+}
+
+body.barcode-scanner-active .fixed,
+body.barcode-scanner-active .shader-bg {
+  background-color: transparent !important;
+}
+
+.transparent-bg {
+  background-color: transparent !important;
+}
+

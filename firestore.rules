@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow list: if isSignedIn(); // Allow list for internal usage if needed
+      
+      allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+        
+      match /daily_logs/{dateStr} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+      
+      match /progress_photos/{photoId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+      
+      match /points/{pointId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+    
+    match /public_profiles/{userId} {
+       allow read: if true;
+       allow write: if isSignedIn() && request.auth.uid == userId;
+    }
+    
+    match /tips/{tipId} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+    
+    match /challenges/{docId} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+    
+    match /community_questions/{id} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+    
+    match /community_answers/{id} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+
+    match /notifications/{id} {
+       allow get: if isSignedIn() && request.auth.uid == resource.data.userId;
+       allow list: if isSignedIn() && request.auth.uid == resource.data.userId;
+       allow create: if isSignedIn();
+       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+    
+    match /mentorships/{id} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+    
+    match /chats/{id} {
+       allow read, write: if isSignedIn();
+       match /messages/{mid} {
+          allow read, write: if isSignedIn();
+       }
+    }
+    
+    // Compatibility matches for older collection names
+    match /community_tips/{id} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+    match /community_challenges/{id} {
+       allow read: if true;
+       allow write: if isSignedIn();
+    }
+  }
+}
