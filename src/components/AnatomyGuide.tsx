@@ -44,10 +44,13 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
   const [expandedExercise, setExpandedExercise] = useState<Exercise | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [api, setApi] = useState<any>(null);
+  const nodeMapRef = useRef<any>(null);
+  const lastPickTimeRef = useRef(0);
+  const isProcessingPickRef = useRef(false);
 
   // Initialize Sketchfab API
   useEffect(() => {
-    if (!isOpen || !iframeRef.current) return;
+    if (!isOpen || !iframeRef.current || !window.Sketchfab) return;
 
     const client = new window.Sketchfab('1.12.1', iframeRef.current);
 
@@ -58,27 +61,40 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
 
     client.init('9bfa112a99844626ac2480fff6276f0e', {
       success: (api: any) => {
-        api.start();
+        if (typeof api.start === 'function') api.start();
         api.addEventListener('viewerready', () => {
           setApi(api);
           
+          // Pre-fetch node map to avoid calling it in mousemove
+          if (typeof api.getNodeMap === 'function') {
+            api.getNodeMap((err: any, nodes: any) => {
+              if (!err) nodeMapRef.current = nodes;
+            });
+          }
+
           // Set Camera Constraints to fix centering and limit zoom
-          api.setCameraConstraints({
-            usePan: false,
-            useZoom: true,
-            zoomIn: 30, // Minimum distance
-            zoomOut: 160 // Maximum distance
-          });
+          if (typeof api.setCameraConstraints === 'function') {
+            api.setCameraConstraints({
+              usePan: false,
+              useZoom: true,
+              zoomIn: 30, // Minimum distance
+              zoomOut: 160 // Maximum distance
+            });
+          }
 
           // Increase interaction sensitivity
-          api.setUserInteractionOptions({
-            orbitSpeed: 1.5,
-            zoomSpeed: 1.5
-          });
+          if (typeof api.setUserInteractionOptions === 'function') {
+            api.setUserInteractionOptions({
+              orbitSpeed: 1.5,
+              zoomSpeed: 1.5
+            });
+          }
           
           // Focus precisely on the torso area (Pivot placed deep inside the chest cavity)
           // Eye: [0, -85, 120], Target: [0, 0, 120]
-          api.setCameraLookAt([0, -85, 120], [0, 0, 120], 0);
+          if (typeof api.setCameraLookAt === 'function') {
+            api.setCameraLookAt([0, -85, 120], [0, 0, 120], 0);
+          }
 
           // Setup Hover Detection with safety checks
           container = iframeRef.current?.parentElement || null;
@@ -92,30 +108,36 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
               
               setMousePos({ x: e.clientX, y: e.clientY });
 
-              // Check if pick exists before calling
+              // Throttle picking to 100ms and avoid concurrent picks
+              const now = Date.now();
+              if (now - lastPickTimeRef.current < 100 || isProcessingPickRef.current) return;
+
               const pickMethod = api.pick || api.pickFromScreen;
               if (typeof pickMethod === 'function') {
+                isProcessingPickRef.current = true;
+                lastPickTimeRef.current = now;
+                
                 pickMethod.call(api, x, y, (err: any, info: any) => {
+                  isProcessingPickRef.current = false;
                   if (!err && info && info.instanceID) {
-                    api.getNodeMap((err: any, nodes: any) => {
-                      if (!err && nodes && nodes[info.instanceID]) {
-                        const node = nodes[info.instanceID];
-                        const rawName = node.name || '';
-                        
-                        const muscleName = Object.keys(NODE_NAME_MAPPING).find(key => 
-                          rawName.toLowerCase().includes(key.toLowerCase())
-                        );
+                    const nodes = nodeMapRef.current;
+                    if (nodes && nodes[info.instanceID]) {
+                      const node = nodes[info.instanceID];
+                      const rawName = node.name || '';
+                      
+                      const muscleName = Object.keys(NODE_NAME_MAPPING).find(key => 
+                        rawName.toLowerCase().includes(key.toLowerCase())
+                      );
 
-                        if (muscleName) {
-                          setHoveredMuscle(NODE_NAME_MAPPING[muscleName]);
-                        } else if (rawName.length > 3 && !rawName.includes('Skeleton')) {
-                          const cleanName = rawName.split('_').pop()?.replace(/[0-9]/g, '');
-                          setHoveredMuscle(cleanName || null);
-                        } else {
-                          setHoveredMuscle(null);
-                        }
+                      if (muscleName) {
+                        setHoveredMuscle(NODE_NAME_MAPPING[muscleName]);
+                      } else if (rawName.length > 3 && !rawName.includes('Skeleton')) {
+                        const cleanName = rawName.split('_').pop()?.replace(/[0-9]/g, '');
+                        setHoveredMuscle(cleanName || null);
+                      } else {
+                        setHoveredMuscle(null);
                       }
-                    });
+                    }
                   } else {
                     setHoveredMuscle(null);
                   }
@@ -136,23 +158,22 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
               if (typeof pickMethod === 'function') {
                 pickMethod.call(api, x, y, (err: any, info: any) => {
                   if (!err && info && info.instanceID) {
-                    api.getNodeMap((err: any, nodes: any) => {
-                      if (!err && nodes && nodes[info.instanceID]) {
-                        const node = nodes[info.instanceID];
-                        const rawName = node.name || '';
-                        
-                        const muscleKey = Object.keys(NODE_NAME_MAPPING).find(key => 
-                          rawName.toLowerCase().includes(key.toLowerCase())
-                        );
+                    const nodes = nodeMapRef.current;
+                    if (nodes && nodes[info.instanceID]) {
+                      const node = nodes[info.instanceID];
+                      const rawName = node.name || '';
+                      
+                      const muscleKey = Object.keys(NODE_NAME_MAPPING).find(key => 
+                        rawName.toLowerCase().includes(key.toLowerCase())
+                      );
 
-                        if (muscleKey) {
-                          const muscleName = NODE_NAME_MAPPING[muscleKey];
-                          setSelectedMuscle(prev => prev === muscleName ? null : muscleName);
-                        } else {
-                          setSelectedMuscle(null);
-                        }
+                      if (muscleKey) {
+                        const muscleName = NODE_NAME_MAPPING[muscleKey];
+                        setSelectedMuscle(prev => prev === muscleName ? null : muscleName);
+                      } else {
+                        setSelectedMuscle(null);
                       }
-                    });
+                    }
                   } else {
                     setSelectedMuscle(null);
                   }
@@ -181,7 +202,7 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
     });
 
     return () => {
-      if (api) api.stop();
+      if (api && typeof api.stop === 'function') api.stop();
       if (container) {
         if (handleMouseMove) container.removeEventListener('mousemove', handleMouseMove);
         if (handleMouseLeave) container.removeEventListener('mouseleave', handleMouseLeave);
@@ -202,8 +223,9 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
       return;
     }
 
-    api.getNodeMap((err: any, nodes: any) => {
-      if (err) return;
+    if (typeof api.getNodeMap === 'function') {
+      api.getNodeMap((err: any, nodes: any) => {
+        if (err) return;
 
       // Find nodes that belong to the selected muscle group
       const targetNodes = Object.values(nodes).filter((node: any) => {
@@ -230,6 +252,7 @@ export default function AnatomyGuide({ isOpen, onClose }: AnatomyGuideProps) {
         }
       }
     });
+    }
   }, [api, selectedMuscle]);
 
   // Handle manual zoom

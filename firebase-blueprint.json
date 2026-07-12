@@ -39,9 +39,20 @@
         "meals": { "type": "array" },
         "waterIntake": { "type": "array" },
         "dailySteps": { "type": "number" },
-        "workoutDiary": { "type": "array" }
+        "workoutDiary": { "type": "array" },
+        "onboardingCompleted": { "type": "boolean" }
       },
       "required": ["name", "email", "points"]
+    },
+    "LoginAttempt": {
+      "title": "Login Attempt",
+      "description": "Tracking failed login attempts for brute force protection",
+      "type": "object",
+      "properties": {
+        "attempts": { "type": "number" },
+        "lastAttempt": { "type": "string" },
+        "date": { "type": "string" }
+      }
     }
   },
   "firestore": {
@@ -64,6 +75,10 @@
     },
     "community_questions/{id}": {
       "description": "Expert Q&A collection"
+    },
+    "login_throttling/{emailHash}": {
+      "schema": "LoginAttempt",
+      "description": "Daily login failure counters keyed by hashed email"
     }
   }
 }

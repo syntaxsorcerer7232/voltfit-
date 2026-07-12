@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { AppState, UserProfile } from '../types';
 import { calculateMacros } from '../utils/calories';
 import { auth, db } from '../lib/firebase';
+import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 import { BadgeDef, BADGES } from '../utils/gamification';
 
 export interface AppLogsState {
@@ -291,28 +292,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         unsubscribeChallenges = onSnapshot(challengesQ, (snapshot) => {
           const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setState({ challenges: data as any });
-        }, (err) => console.error("Global Challenges sync error:", err.code, err.message));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'challenges'));
 
         // 2. Tips Sync
         const tipsQ = query(collection(db, 'tips'), orderBy('createdAt', 'desc'), limit(100));
         unsubscribeTips = onSnapshot(tipsQ, (snapshot) => {
           const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setState({ communityTips: data as any });
-        }, (err) => console.error("Global Tips sync error:", err.code, err.message));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'tips'));
 
         // 3. Questions Sync
         const questionsQ = query(collection(db, 'community_questions'), orderBy('createdAt', 'desc'), limit(50));
         const unsubscribeQuestions = onSnapshot(questionsQ, (snapshot) => {
           const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setState({ communityQuestions: data as any });
-        }, (err) => console.error("Global Questions sync error:", err.code, err.message));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'community_questions'));
 
         // 4. Leaderboard Sync
         const leaderboardQ = query(collection(db, 'public_profiles'), orderBy('points', 'desc'), limit(50));
         const unsubscribeLeaderboard = onSnapshot(leaderboardQ, (snapshot) => {
           const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
           setState({ leaderboard: data as any });
-        }, (err) => console.error("Global Leaderboard sync error:", err.code, err.message));
+        }, (err) => handleFirestoreError(err, OperationType.LIST, 'public_profiles'));
 
         return () => {
           unsubscribeChallenges?.();

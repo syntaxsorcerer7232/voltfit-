@@ -47,25 +47,28 @@ async function startServer() {
     }
 
     try {
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = new GoogleGenAI({ apiKey });
       
-      const chat = ai.chats.create({
-        model: "gemini-1.5-flash",
-        history: history || [],
-        config: {
-          systemInstruction: systemInstruction || "You are a professional fitness trainer and anatomy expert."
+      // Map history to the format expected by some models if needed, 
+      // but for interactions.create, we can use previous_interaction_id if we had it.
+      // Since we don't have it from the client, we'll construct a prompt that includes history context.
+      
+      let contextPrompt = "";
+      if (history && history.length > 0) {
+        contextPrompt = "Previous Conversation:\n" + history.map((m: any) => `${m.role}: ${m.parts[0].text}`).join('\n') + "\n\n";
+      }
+      contextPrompt += `User: ${prompt}`;
+
+      const interaction = await ai.interactions.create({
+        model: "gemini-3.5-flash",
+        input: contextPrompt,
+        system_instruction: systemInstruction || "You are a professional fitness trainer and anatomy expert.",
+        generation_config: {
+          max_output_tokens: 2048,
         }
       });
 
-      const result = await chat.sendMessage({ message: prompt });
-      res.json({ text: result.text });
+      res.json({ text: interaction.output_text });
     } catch (error: any) {
       console.error('Chat error:', error);
       res.status(500).json({ error: error.message });
@@ -83,14 +86,7 @@ async function startServer() {
     }
 
     try {
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = new GoogleGenAI({ apiKey });
       
       const prompt = `Based on the following workout history and user's active focus areas:
 Focus Areas: ${activeFocus?.join(', ') || 'General Fitness'}
@@ -98,26 +94,23 @@ Recent Workouts: ${JSON.stringify(workoutHistory || [])}
 
 Provide exactly 2 or 3 short, actionable exercise or habit recommendations tailored to the user.`;
 
-      const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  reason: { type: Type.STRING }
-                },
-                required: ["name", "reason"]
-              }
-            }
+      const interaction = await ai.interactions.create({
+        model: "gemini-3.5-flash",
+        input: prompt,
+        response_format: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              reason: { type: Type.STRING }
+            },
+            required: ["name", "reason"]
+          }
         }
       });
 
-      const recommendations = JSON.parse(result.text || '[]');
+      const recommendations = JSON.parse(interaction.output_text || '[]');
       res.json(recommendations);
     } catch (error: any) {
       console.error('Recommendations error:', error);
@@ -136,14 +129,7 @@ Provide exactly 2 or 3 short, actionable exercise or habit recommendations tailo
     }
 
     try {
-      const ai = new GoogleGenAI({ 
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          }
-        }
-      });
+      const ai = new GoogleGenAI({ apiKey });
       
       const prompt = `As a professional high-performance athletic coach specializing in natural (drug-free) physiological limits, analyze the following recovery factors for an athlete.
 
@@ -167,30 +153,62 @@ Your task:
 2. Provide a 1-2 sentence high-level status assessment.
 3. Provide 3 specific, actionable tactical recommendations for today (e.g., intensity adjustments, nutritional tweaks, recovery modalities).`;
 
-      const result = await ai.models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: prompt,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                score: { type: Type.NUMBER },
-                status: { type: Type.STRING },
-                recommendations: { 
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING }
-                }
-              },
-              required: ["score", "status", "recommendations"]
+      const interaction = await ai.interactions.create({
+        model: "gemini-3.5-flash",
+        input: prompt,
+        response_format: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.NUMBER },
+            status: { type: Type.STRING },
+            recommendations: { 
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
             }
+          },
+          required: ["score", "status", "recommendations"]
         }
       });
 
-      const recoveryAI = JSON.parse(result.text || '{}');
+      const recoveryAI = JSON.parse(interaction.output_text || '{}');
       res.json(recoveryAI);
     } catch (error: any) {
       console.error('Recovery AI error:', error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Generate Image
+  app.post('/api/generate-image', async (req, res) => {
+    const { prompt } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'Gemini API key not configured.' });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const interaction = await ai.interactions.create({
+        model: 'gemini-3.1-flash-lite-image',
+        input: `Professional, ultra-realistic fitness demonstration of: ${prompt}. Cinematic lighting, clean minimalist athletic studio background, showing perfect form and biological accuracy. High-definition photographic style. NO abstract art, NO distorted anatomy, NO text. If the subject is not a clearly identifiable fitness exercise or gym equipment, do not attempt to generate it.`,
+        response_modalities: ['image'],
+        generation_config: {
+          image_config: {
+            aspect_ratio: "16:9",
+            image_size: "1K"
+          },
+        },
+      });
+
+      if (interaction.output_image) {
+        const { data, mime_type } = interaction.output_image;
+        res.json({ url: `data:${mime_type};base64,${data}` });
+      } else {
+        res.status(500).json({ error: 'Failed to generate image' });
+      }
+    } catch (error: any) {
+      console.error('Image generation error:', error);
       res.status(500).json({ error: error.message });
     }
   });

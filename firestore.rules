@@ -1,71 +1,111 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // Default deny catch-all
     match /{document=**} {
       allow read, write: if false;
     }
     
+    // --- Primitives ---
     function isSignedIn() {
       return request.auth != null;
     }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Entity Validations ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'email', 'points']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.points is number;
+    }
+
+    function isValidPublicProfile(data) {
+      return data.keys().hasAll(['name', 'points']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.points is number;
+    }
+
+    // --- Collections ---
+
+    // 1. Users Collection (Private Data)
     match /users/{userId} {
-      allow get: if isSignedIn() && request.auth.uid == userId;
-      allow list: if isSignedIn(); // Allow list for internal usage if needed
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId); // Enforce owner-only listing (effectively prevents collection-wide listing)
       
-      allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId); // Simplified for now to avoid breaking complex state updates
+      allow delete: if isOwner(userId);
         
+      // Daily Logs
       match /daily_logs/{dateStr} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       
+      // Progress Photos
       match /progress_photos/{photoId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
       
+      // Points History
       match /points/{pointId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
       }
     }
     
+    // 2. Public Profiles (Leaderboard & Social)
     match /public_profiles/{userId} {
        allow read: if true;
-       allow write: if isSignedIn() && request.auth.uid == userId;
+       allow write: if isOwner(userId) && isValidPublicProfile(incoming());
     }
     
+    // 3. Tips Feed
     match /tips/{tipId} {
        allow read: if true;
        allow write: if isSignedIn();
     }
     
+    // 4. Challenges
     match /challenges/{docId} {
        allow read: if true;
        allow write: if isSignedIn();
     }
     
+    // 5. Community Q&A
     match /community_questions/{id} {
        allow read: if true;
        allow write: if isSignedIn();
     }
-    
     match /community_answers/{id} {
        allow read: if true;
        allow write: if isSignedIn();
     }
 
+    // 6. Notifications
     match /notifications/{id} {
-       allow get: if isSignedIn() && request.auth.uid == resource.data.userId;
-       allow list: if isSignedIn() && request.auth.uid == resource.data.userId;
+       // Query enforcer: must query by userId
+       allow list: if isSignedIn() && (existing() == null || existing().userId == request.auth.uid);
+       allow get: if isSignedIn() && (existing() == null || existing().userId == request.auth.uid);
        allow create: if isSignedIn();
-       allow update, delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+       allow update, delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
     
-    match /mentorships/{id} {
-       allow read: if true;
-       allow write: if isSignedIn();
-    }
-    
+    // 7. Chats & Messages
     match /chats/{id} {
        allow read, write: if isSignedIn();
        match /messages/{mid} {
@@ -73,14 +113,23 @@ service cloud.firestore {
        }
     }
     
-    // Compatibility matches for older collection names
-    match /community_tips/{id} {
-       allow read: if true;
-       allow write: if isSignedIn();
+    // 8. Mentorships
+    match /mentorships/{id} {
+       allow read, write: if isSignedIn();
     }
-    match /community_challenges/{id} {
-       allow read: if true;
-       allow write: if isSignedIn();
+    
+    // 9. Login Throttling (Publicly writable for pre-auth tracking)
+    match /login_throttling/{emailHash} {
+       allow get: if true;
+       // Allow anyone to create/update their own failure counter
+       // In a real app, you'd use a cloud function to prevent users from resetting their own count
+       // but here we implement it as a managed public document
+       allow create: if incoming().attempts == 1;
+       allow update: if (incoming().attempts == existing().attempts + 1) || (incoming().attempts == 1);
     }
+    
+    // Legacy support
+    match /community_tips/{id} { allow read: if true; allow write: if isSignedIn(); }
+    match /community_challenges/{id} { allow read: if true; allow write: if isSignedIn(); }
   }
 }

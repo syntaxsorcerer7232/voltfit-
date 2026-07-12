@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext, useAppLogs } from '../context/AppContext';
-import { User, Settings, BarChart3, Settings2, Target, MapPin, ChevronRight, ChevronLeft, X, LogOut, Camera, Save, Download, Flame, FileText, Database, Image as ImageIcon, Sun, Moon, Music, Bell, FlaskConical } from 'lucide-react';
+import { User, Settings, BarChart3, Settings2, Target, MapPin, ChevronRight, ChevronLeft, X, LogOut, Camera, Save, Download, Flame, FileText, Database, Image as ImageIcon, Sun, Moon, Music, Bell, FlaskConical, Bot } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../components/BottomNav';
@@ -22,7 +22,7 @@ import SupplementMenu from '../components/SupplementMenu';
 
 type SubView = 'main' | 'profile' | 'settings' | 'stats' | 'preferences' | 'goals' | 'gyms' | 'progress' | 'music' | 'customFoods' | 'notifications' | 'supplements';
 
-export default function MoreMenu({ navigate }: { navigate?: (tab: string) => void }) {
+export default function MoreMenu({ navigate, openAIChat }: { navigate?: (tab: string) => void, openAIChat?: () => void }) {
   const { user, updateUser, setOnboardingCompleted, workoutHistory, theme, setTheme } = useAppContext();
   const { meals } = useAppLogs();
   const [activeView, setActiveView] = useState<SubView>('main');
@@ -85,6 +85,7 @@ export default function MoreMenu({ navigate }: { navigate?: (tab: string) => voi
     { id: 'stats', icon: BarChart3, label: 'Body Stats', sub: 'View your measurements', color: 'bg-blue-500/10 text-blue-500' },
     { id: 'preferences', icon: Settings2, label: 'Preferences', sub: 'Customize your experience', color: 'bg-lime-500/10 text-lime-500' },
     { id: 'goals', icon: Target, label: 'Goals', sub: 'Manage your fitness goals', color: 'bg-yellow-500/10 text-yellow-500' },
+    { id: 'aiChat', icon: Bot, label: 'Neural Advisor', sub: 'Expert fitness & anatomy AI', color: 'bg-primary/10 text-primary shadow-[0_0_15px_rgba(var(--color-primary-rgb),0.2)]' },
     { id: 'gyms', icon: MapPin, label: 'Nearby Gyms', sub: 'Find gyms near you', color: 'bg-neutral-500/10 text-neutral-500' },
   ];
 
@@ -155,7 +156,13 @@ export default function MoreMenu({ navigate }: { navigate?: (tab: string) => voi
                {menuItems.map(item => (
                  <button 
                   key={item.id}
-                  onClick={() => setActiveView(item.id as SubView)}
+                  onClick={() => {
+                    if (item.id === 'aiChat' && openAIChat) {
+                      openAIChat();
+                    } else {
+                      setActiveView(item.id as SubView);
+                    }
+                  }}
                    className="w-full bg-surface-elevated/50 backdrop-blur-md p-5 rounded-[2.2rem] border border-card-border flex items-center group active:scale-[0.98] transition-all hover:bg-surface-elevated hover:border-primary/20 shadow-lg"
                  >
                     <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mr-5 transition-colors shadow-sm", item.color)}>

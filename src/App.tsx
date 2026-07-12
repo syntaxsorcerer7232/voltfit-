@@ -6,8 +6,9 @@
 import React, { useEffect, useState, Suspense, lazy, useRef } from 'react';
 import { AnimatePresence, motion, PanInfo } from 'motion/react';
 import { AppProvider, useAppContext } from './context/AppContext';
-import { RefreshCw } from 'lucide-react';
+import { Bot, RefreshCw } from 'lucide-react';
 import { cn } from './components/BottomNav';
+import { AITrainerChat } from './components/AITrainerChat';
 
 import Auth from './screens/Auth';
 import Onboarding from './screens/Onboarding';
@@ -71,6 +72,7 @@ function MainApp() {
 
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [barDirection, setBarDirection] = useState<'up' | 'left' | 'right'>('up');
+  const [showAITrainer, setShowAITrainer] = useState(false);
 
   const triggerMiniPlayer = (dir: 'up' | 'left' | 'right' = 'up') => {
     setBarDirection(dir);
@@ -226,7 +228,7 @@ function MainApp() {
              setOnboardingCompleted(false);
           }
           setIsDataLoading(false);
-          handleFirestoreError(error, OperationType.GET, 'users');
+          handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
         });
 
         // 2. LISTEN TO THE TODAY'S LOGS DOCUMENT (Separated from user profile doc)
@@ -415,7 +417,7 @@ function MainApp() {
       case 'workouts': return <Workouts />;
       case 'diet': return <Diet />;
       case 'community': return <Community />;
-      case 'more': return <MoreMenu navigate={switchTab} />;
+      case 'more': return <MoreMenu navigate={switchTab} openAIChat={() => setShowAITrainer(true)} />;
       default: return <Dashboard navigate={switchTab} />;
     }
   };
@@ -473,6 +475,16 @@ function MainApp() {
       </div>
       
       <div className="absolute bottom-0 z-[100] w-full max-w-3xl mx-auto pointer-events-none">
+        {/* AI Floating Button */}
+        <div className="absolute -top-16 right-4 pointer-events-auto">
+          <button 
+            onClick={() => setShowAITrainer(true)}
+            className="w-14 h-14 bg-primary text-black rounded-full flex items-center justify-center shadow-glow active:scale-95 transition-all hover:scale-110 border-4 border-background"
+          >
+            <Bot size={28} strokeWidth={3} />
+          </button>
+        </div>
+
         <div className="relative w-full px-4 pt-4 pb-4 flex flex-col justify-end pointer-events-auto">
           <AnimatePresence mode="wait" initial={false}>
             {showMiniPlayer ? (
@@ -518,6 +530,20 @@ function MainApp() {
           <div className="h-safe-bottom" />
         </div>
       </div>
+      <AnimatePresence>
+        {showAITrainer && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-6"
+          >
+            <div className="w-full h-full relative">
+              <AITrainerChat onClose={() => setShowAITrainer(false)} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

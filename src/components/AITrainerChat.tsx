@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, User, Bot, Loader2, X, RefreshCw, MessageSquare } from 'lucide-react';
 import Markdown from 'react-markdown';
+import { DynamicExerciseImage } from './DynamicExerciseImage';
 import { useAppContext, useAppLogs } from '../context/AppContext';
 import { EXERCISE_LIBRARY } from '../data/exercises';
 
@@ -48,9 +49,7 @@ GUIDELINES:
 5. Consider their supplements when giving nutritional or recovery advice.
 6. Suggest specific exercises, sets, and reps based on their goal.
 7. Provide recovery tips if their sleep or mood indicates fatigue.
-8. When recommending an exercise, ALWAYS include a relevant image using Markdown: 
-   ![Exercise Name](https://loremflickr.com/400/250/gym,exercise,workout?lock=RANDOM_NUMBER) 
-   Try to be specific with keywords (e.g., /gym,bench-press).
+8. When recommending a well-known, standard exercise, you MAY include a relevant image using Markdown: ![Exercise Name]. ONLY do this for specific exercises where visual demonstration is highly beneficial. If the exercise is non-standard, custom, or if you are unsure, do NOT include an image. Accuracy is critical; wrong images are strictly prohibited.
 9. Keep responses concise but informative.
 10. Use Markdown for formatting (bolding, lists, etc.).`;
 
@@ -195,7 +194,13 @@ GUIDELINES:
                   : 'bg-white/5 border border-white/10 text-white/90'
               }`}>
                 <div className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-strong:text-[#84cc16]">
-                  <Markdown>{msg.parts[0].text}</Markdown>
+                  <Markdown
+                    components={{
+                      img: ({ alt }) => <DynamicExerciseImage alt={alt || 'Fitness exercise'} className="w-full aspect-video object-cover rounded-xl mt-4 mb-2 shadow-glow-sm" />
+                    }}
+                  >
+                    {msg.parts[0].text}
+                  </Markdown>
                 </div>
               </div>
             </div>

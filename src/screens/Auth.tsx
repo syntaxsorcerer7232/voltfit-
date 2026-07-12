@@ -6,12 +6,16 @@ import {
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   browserPopupRedirectResolver 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useAppContext } from '../context/AppContext';
 import AuthError from '../components/AuthError';
+
+const MAX_FAILED_ATTEMPTS = 5;
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -23,7 +27,95 @@ export default function Auth() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { setOnboardingCompleted } = useAppContext();
 
+  // Helper to get today's date string
+  const getTodayStr = () => new Date().toISOString().split('T')[0];
+  
+  // Helper to get email doc ID
+  const getEmailDocId = (email: string) => btoa(email.toLowerCase()).replace(/=/g, '');
+
+  const checkThrottling = async (email: string) => {
+    const docId = getEmailDocId(email);
+    const throttleRef = doc(db, 'login_throttling', docId);
+    const snap = await getDoc(throttleRef);
+    
+    if (snap.exists()) {
+      const data = snap.data();
+      const today = getTodayStr();
+      
+      if (data.date === today && data.attempts >= MAX_FAILED_ATTEMPTS) {
+        return { blocked: true, attempts: data.attempts };
+      }
+      
+      // If different day, reset
+      if (data.date !== today) {
+        await deleteDoc(throttleRef);
+      }
+    }
+    return { blocked: false };
+  };
+
+  const recordFailure = async (email: string) => {
+    const docId = getEmailDocId(email);
+    const throttleRef = doc(db, 'login_throttling', docId);
+    const snap = await getDoc(throttleRef);
+    const today = getTodayStr();
+
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data.date === today) {
+        await updateDoc(throttleRef, {
+          attempts: data.attempts + 1,
+          lastAttempt: new Date().toISOString()
+        });
+      } else {
+        await setDoc(throttleRef, {
+          attempts: 1,
+          date: today,
+          lastAttempt: new Date().toISOString()
+        });
+      }
+    } else {
+      await setDoc(throttleRef, {
+        attempts: 1,
+        date: today,
+        lastAttempt: new Date().toISOString()
+      });
+    }
+  };
+
+  const resetFailure = async (email: string) => {
+    const docId = getEmailDocId(email);
+    const throttleRef = doc(db, 'login_throttling', docId);
+    await deleteDoc(throttleRef);
+  };
+
+  const [isInIframe] = useState(() => {
+    try {
+      return window.self !== window.top;
+    } catch (e) {
+      return true;
+    }
+  });
+
   const clearError = () => setError('');
+
+  React.useEffect(() => {
+    const checkRedirect = async () => {
+      try {
+        setGoogleLoading(true);
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          // Successfully signed in via redirect!
+        }
+      } catch (err: any) {
+        console.error("Google Redirect Result Error:", err);
+        // Do not block the interface with transient redirect result errors
+      } finally {
+        setGoogleLoading(false);
+      }
+    };
+    checkRedirect();
+  }, []);
 
   const handleGoogleAuth = async () => {
     clearError();
@@ -50,7 +142,15 @@ export default function Auth() {
       
       let msg = err.message || 'Google sign-in failed';
       if (err.code === 'auth/popup-blocked') {
-        msg = "The sign-in popup was blocked by your browser. Please allow popups for this site.";
+        // Fallback: try signInWithRedirect!
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr: any) {
+          console.error("Google Redirect Auth Error:", redirectErr);
+          msg = "The sign-in popup was blocked by your browser. Please click the 'Open in new tab' button at the top right of the preview window to sign in.";
+        }
       } else if (err.code === 'auth/network-request-failed') {
         msg = "Authentication failed due to iframe or cookie restrictions. Please click the 'Open in new tab' button at the top right of the preview window to sign in.";
       }
@@ -76,7 +176,14 @@ export default function Auth() {
 
     try {
       if (isLogin) {
+        // Check Throttling
+        const throttleStatus = await checkThrottling(email);
+        if (throttleStatus.blocked) {
+          throw { code: 'too-many-failed-attempts', message: `Too many failed attempts. You have reached the daily limit of ${MAX_FAILED_ATTEMPTS}. Please try again tomorrow.` };
+        }
+
         await signInWithEmailAndPassword(auth, email, password);
+        await resetFailure(email);
         clearTimeout(timeout);
       } else {
         if (password.length < 6) {
@@ -89,10 +196,18 @@ export default function Auth() {
     } catch (err: any) {
       clearTimeout(timeout);
       console.error("Auth error:", err);
+      
+      // Handle throttling recording
+      if (isLogin && (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential')) {
+        await recordFailure(email);
+      }
+
       let msg = err.message || 'Authentication failed';
       
-      if (err.code === 'auth/operation-not-allowed') {
-        msg = "Email registration is disabled in configuration. Use Google instead.";
+      if (err.code === 'too-many-failed-attempts') {
+        msg = err.message;
+      } else if (err.code === 'auth/operation-not-allowed') {
+        msg = "Authentication method not enabled. Please enable 'Email/Password' or 'Google' in your Firebase console.";
       } else if (err.code === 'auth/email-already-in-use') {
         msg = "This account already exists. Try signing in instead.";
       } else if (err.code === 'auth/weak-password' || err.message === 'auth/weak-password') {
@@ -119,6 +234,11 @@ export default function Auth() {
       <div className="absolute top-10 w-full text-center left-0 px-6">
          <h1 className="text-3xl font-extrabold tracking-tighter">VoltFit</h1>
          <p className="text-slate-400 mt-2 text-sm font-medium">Log in to track your progress & earn badges.</p>
+         {isInIframe && (
+           <div className="mt-3 mx-auto max-w-xs p-2.5 bg-[#84cc16]/10 border border-[#84cc16]/20 rounded-xl text-[11px] text-[#a3e635] text-center font-semibold">
+             💡 Running in preview: Click "Open in new tab" at top-right for Google Sign-In
+           </div>
+         )}
       </div>
 
       <div className="glass-card rounded-3xl p-6 mt-20 relative z-10 border border-[#2a2a2a] shadow-2xl">

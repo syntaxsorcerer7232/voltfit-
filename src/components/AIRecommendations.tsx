@@ -1,21 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, MessageSquare, Sparkles, Brain, FlaskConical, ShieldCheck, Plus, X as CloseIcon } from 'lucide-react';
+import { Bot, MessageSquare, Sparkles, Brain, FlaskConical, ShieldCheck, Plus, X as CloseIcon, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AITrainerChat } from './AITrainerChat';
 import { SCIENTIFIC_TIPS } from '../data/scientificTips';
 import { useAppContext } from '../context/AppContext';
+import { DynamicExerciseImage } from './DynamicExerciseImage';
 
 export default function AIRecommendations({ activeFocus }: { activeFocus: string[] }) {
-  const { user, updateUser } = useAppContext();
+  const { user, updateUser, workoutHistory } = useAppContext();
   const [showChat, setShowChat] = useState(false);
   const [tip, setTip] = useState(SCIENTIFIC_TIPS[0]);
   const [showSupplementInput, setShowSupplementInput] = useState(false);
   const [newSupplement, setNewSupplement] = useState('');
+  const [recommendations, setRecommendations] = useState<{name: string, reason: string}[]>([]);
+  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
 
   useEffect(() => {
     const randomTip = SCIENTIFIC_TIPS[Math.floor(Math.random() * SCIENTIFIC_TIPS.length)];
     setTip(randomTip);
   }, []);
+
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (!activeFocus || activeFocus.length === 0) return;
+      setIsLoadingRecs(true);
+      try {
+        const response = await fetch('/api/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activeFocus, workoutHistory }),
+        });
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setRecommendations(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch recommendations:', err);
+      } finally {
+        setIsLoadingRecs(false);
+      }
+    };
+
+    fetchRecommendations();
+  }, [activeFocus, workoutHistory]);
 
   const handleAddSupplement = () => {
     if (!newSupplement.trim()) return;
@@ -83,6 +110,29 @@ export default function AIRecommendations({ activeFocus }: { activeFocus: string
           </div>
 
           <div className="space-y-6">
+            {/* Recommendations Section */}
+            {activeFocus && activeFocus.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 px-1">Tactical Suggestions</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {isLoadingRecs ? (
+                    <div className="col-span-full py-8 flex flex-col items-center justify-center bg-white/5 rounded-2xl border border-white/10 border-dashed">
+                      <Loader2 className="w-6 h-6 text-primary animate-spin mb-2" />
+                      <span className="text-[8px] text-white/30 uppercase tracking-[0.2em] font-black">Generating Protocol...</span>
+                    </div>
+                  ) : (
+                    recommendations.map((rec, idx) => (
+                      <div key={idx} className="bg-white/5 border border-white/10 rounded-[2rem] p-5 group/card hover:bg-white/[0.08] transition-all">
+                        <DynamicExerciseImage alt={rec.name} className="w-full h-32 object-cover rounded-2xl mb-4 border border-white/10" />
+                        <h5 className="text-white font-black uppercase italic tracking-tight text-sm mb-1 group-hover/card:text-primary transition-colors">{rec.name}</h5>
+                        <p className="text-white/40 text-[10px] leading-relaxed font-medium uppercase tracking-wider">{rec.reason}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Scientific Tip Section */}
             <div className="relative p-6 rounded-2xl bg-white/[0.03] border border-white/5 group-hover:border-primary/10 transition-all">
               <div className="flex items-center justify-between mb-3">
