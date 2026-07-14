@@ -309,8 +309,8 @@ export default function CommunityChallenges() {
                                  {c.friends && c.friends.length > 0 && (
                                      <>
                                          <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-2 mt-4">Participants Leaderboard</div>
-                                         <div className="space-y-1">
-                                             {[...c.friends].sort((a: any, b: any) => b.progress - a.progress).slice(0, 3).map((f: any, i: number) => (
+                                         <div className="space-y-1 max-h-40 overflow-y-auto pr-1 no-scrollbar">
+                                             {[...c.friends].sort((a: any, b: any) => b.progress - a.progress).map((f: any, i: number) => (
                                                  <div key={i} className={`flex justify-between items-center p-1.5 rounded-lg text-xs ${f.userId === currentUserId ? 'bg-primary/10 text-primary font-bold' : 'text-slate-300'}`}>
                                                      <div className="flex gap-2">
                                                         <span className="opacity-50 font-mono text-[10px] pt-0.5">{i + 1}.</span>

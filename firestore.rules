@@ -29,16 +29,15 @@ service cloud.firestore {
 
     // --- Entity Validations ---
     function isValidUser(data) {
-      return data.keys().hasAll(['name', 'email', 'points']) &&
-             data.name is string && data.name.size() <= 100 &&
-             data.email is string && data.email.size() <= 100 &&
-             data.points is number;
+      // Relaxed validation to prevent permission errors on partial updates or missing fields
+      return (data.get('name', '') is string) &&
+             (data.get('email', '') is string) &&
+             (data.get('points', 0) is number);
     }
 
     function isValidPublicProfile(data) {
-      return data.keys().hasAll(['name', 'points']) &&
-             data.name is string && data.name.size() <= 100 &&
-             data.points is number;
+      return (data.get('name', '') is string) &&
+             (data.get('points', 0) is number);
     }
 
     // --- Collections ---
@@ -46,10 +45,10 @@ service cloud.firestore {
     // 1. Users Collection (Private Data)
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow list: if isOwner(userId); // Enforce owner-only listing (effectively prevents collection-wide listing)
+      allow list: if isOwner(userId); 
       
       allow create: if isOwner(userId) && isValidUser(incoming());
-      allow update: if isOwner(userId); // Simplified for now to avoid breaking complex state updates
+      allow update: if isOwner(userId) && isValidUser(incoming());
       allow delete: if isOwner(userId);
         
       // Daily Logs

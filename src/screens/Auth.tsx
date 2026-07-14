@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, UserPlus, ArrowRight } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
+import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -100,6 +100,10 @@ export default function Auth() {
   const clearError = () => setError('');
 
   React.useEffect(() => {
+    if (!isFirebaseConfigured) {
+      setGoogleLoading(false);
+      return;
+    }
     const checkRedirect = async () => {
       try {
         setGoogleLoading(true);
@@ -118,6 +122,10 @@ export default function Auth() {
   }, []);
 
   const handleGoogleAuth = async () => {
+    if (!isFirebaseConfigured) {
+      setError('Authentication is unavailable because Firebase is not configured. Please add your VITE_FIREBASE_API_KEY in the environment settings.');
+      return;
+    }
     clearError();
     setGoogleLoading(true);
     
@@ -162,6 +170,10 @@ export default function Auth() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isFirebaseConfigured) {
+      setError('Authentication is unavailable because Firebase is not configured.');
+      return;
+    }
     if (!email || !password) {
       setError('Please fill in all email and password fields');
       return;
@@ -237,6 +249,12 @@ export default function Auth() {
          {isInIframe && (
            <div className="mt-3 mx-auto max-w-xs p-2.5 bg-[#84cc16]/10 border border-[#84cc16]/20 rounded-xl text-[11px] text-[#a3e635] text-center font-semibold">
              💡 Running in preview: Click "Open in new tab" at top-right for Google Sign-In
+           </div>
+         )}
+         {!isFirebaseConfigured && (
+           <div className="mt-3 mx-auto max-w-xs p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-[11px] text-amber-200 text-center">
+             <p className="font-bold mb-1 uppercase tracking-wider">⚠️ System Standalone Mode</p>
+             Firebase is not configured. Authentication and cloud features are disabled. Please set <code className="bg-amber-900/40 px-1 rounded">VITE_FIREBASE_API_KEY</code> to enable.
            </div>
          )}
       </div>

@@ -12,6 +12,14 @@ export const DynamicExerciseImage: React.FC<DynamicExerciseImageProps> = ({ alt,
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      if (isMounted && isLoading) {
+        setIsLoading(false);
+        setError(true);
+      }
+    }, 8000); // 8 second hard timeout for "instant" feel
+
     const fetchImage = async () => {
       if (!alt) {
         setIsLoading(false);
@@ -26,20 +34,29 @@ export const DynamicExerciseImage: React.FC<DynamicExerciseImageProps> = ({ alt,
         });
 
         const data = await response.json();
-        if (data.url) {
-          setImageUrl(data.url);
-        } else {
-          setError(true);
+        if (isMounted) {
+          if (data.url) {
+            setImageUrl(data.url);
+          } else {
+            setError(true);
+          }
         }
       } catch (err) {
         console.error('Failed to generate image:', err);
-        setError(true);
+        if (isMounted) setError(true);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+          clearTimeout(timeoutId);
+        }
       }
     };
 
     fetchImage();
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [alt]);
 
   if (isLoading) {

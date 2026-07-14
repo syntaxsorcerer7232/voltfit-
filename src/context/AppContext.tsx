@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef, useReducer } from 'react';
 import { AppState, UserProfile } from '../types';
 import { calculateMacros } from '../utils/calories';
-import { auth, db } from '../lib/firebase';
+import { auth, db, isFirebaseConfigured } from '../lib/firebase';
 import { handleFirestoreError, OperationType } from '../utils/firebaseErrors';
 import { BadgeDef, BADGES } from '../utils/gamification';
 
@@ -31,7 +31,7 @@ export interface ToastDef {
 interface AppContextType extends AppState {
   selectedDate: Date | null;
   setSelectedDate: (date: Date | null) => void;
-  updateUser: (data: Partial<UserProfile>, overrideHistory?: import('../types').WorkoutHistoryItem[]) => void;
+  updateUser: (data: Partial<UserProfile>, overrideHistory?: import('../types').WorkoutHistoryItem[], localOnly?: boolean) => void;
   updateWorkoutSchedule: (schedule: import('../types').WorkoutSchedule) => Promise<void>;
   setOnboardingCompleted: (completed: boolean) => void;
   setDisciplineMode: (active: boolean) => void;
@@ -284,6 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubscribeTips: (() => void) | null = null;
 
     const startGlobalSync = async () => {
+      if (!isFirebaseConfigured) return;
       try {
         const { collection, query, orderBy, limit, onSnapshot } = await import('firebase/firestore');
         
@@ -622,20 +623,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   if (err.code === 'not-found') {
                       await setDoc(userRef, updatesToPush, { merge: true });
                   } else {
-                      console.error('Failed to sync profile to firestore', err);
+                      handleFirestoreError(err, OperationType.UPDATE, `users/${auth.currentUser!.uid}`);
                   }
                }
            } catch (err) {
-               console.error('Failed to load firestore for profile sync', err);
+               handleFirestoreError(err, OperationType.UPDATE, `users/${auth.currentUser!.uid}`);
            }
        }, 2000);
     }
   }, []);
 
-  const updateUser = useCallback(async (data: Partial<UserProfile>, overrideHistory?: import('../types').WorkoutHistoryItem[]) => {
+  const updateUser = useCallback(async (data: Partial<UserProfile>, overrideHistory?: import('../types').WorkoutHistoryItem[], localOnly: boolean = false) => {
     const now = new Date().toISOString();
 
-    if (auth.currentUser) {
+    if (auth.currentUser && !localOnly) {
       try {
         const { doc, setDoc } = await import('firebase/firestore');
         const userRef = doc(db, 'users', auth.currentUser.uid);
@@ -660,7 +661,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         console.log('[updateUser] Direct cloud profile sync successful.');
       } catch (err) {
-        console.error('[updateUser] Instant profile sync failed:', err);
+        handleFirestoreError(err, OperationType.WRITE, `users/${auth.currentUser.uid}`);
       }
     }
 
@@ -716,10 +717,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const updatePromises = [];
 
               // Atomic increment
-              const p1 = updateDoc(userRef, { points: increment(points) }).catch((err: any) => {
+              const p1 = updateDoc(userRef, { 
+                  points: increment(points),
+                  updatedAt: Date.now()
+              }).catch((err: any) => {
                   console.warn(`[awardPoints] users doc updateDoc failed: ${err.message}. Creating document.`);
-                  if (err.code === 'not-found') {
-                     return setDoc(userRef, { points: points }, { merge: true });
+                  if (err.code === 'not-found' || err.code === 'permission-denied') {
+                      return setDoc(userRef, { 
+                          points: points, 
+                          onboardingCompleted: true,
+                          updatedAt: Date.now()
+                      }, { merge: true });
                   }
                   throw err;
               });
@@ -803,7 +811,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 await setDoc(logRef, { ...updatesToPush, userId: auth.currentUser!.uid, date: today, updatedAt: new Date().toISOString() }, { merge: true });
                 console.log(`[syncLogsToFirestore] Successfully synced user-submitted logs to ${logsRefPath}`);
             } catch (err) {
-                console.error('Failed to sync logs to firestore', err);
+                handleFirestoreError(err, OperationType.WRITE, logsRefPath);
             }
         }, 2000);
     }

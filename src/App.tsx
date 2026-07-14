@@ -29,7 +29,7 @@ import Toast from './components/Toast';
 import PermissionRequestFlow from './components/PermissionRequestFlow';
 import ErrorBoundary from './components/ErrorBoundary';
 import MiniPlayer from './components/MiniPlayer';
-import { auth, db } from './lib/firebase';
+import { auth, db, isFirebaseConfigured } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 
@@ -138,6 +138,12 @@ function MainApp() {
       }
     } catch (e) {}
 
+    if (!isFirebaseConfigured) {
+      setIsAuthChecking(false);
+      setIsDataLoading(false);
+      return;
+    }
+
     const unsub = onAuthStateChanged(auth, (user) => {
       setIsAuthChecking((prevChecking) => {
         if (!prevChecking && user) {
@@ -154,7 +160,8 @@ function MainApp() {
       
       if (user) {
         if (user.email) {
-          updateUser({ id: user.uid, email: user.email });
+          // Sync local state only during auth transition to prevent permission errors before doc exists
+          updateUser({ id: user.uid, email: user.email }, undefined, true);
         }
         
         try {
@@ -209,22 +216,26 @@ function MainApp() {
                 });
              }
 
-             if (data.onboardingCompleted === true || data.name) {
+             if (data.onboardingCompleted === true || (data.name && data.name.length > 0)) {
                  setOnboardingCompleted(true);
              } else {
-                 if (!docSnap.metadata.fromCache) {
+                 // Only reset if we are definitely seeing the server state and it's missing core info
+                 if (!docSnap.metadata.fromCache && data.onboardingCompleted === false) {
                      setOnboardingCompleted(false);
                  }
              }
           } else {
              if (!(docSnap as any).metadata.fromCache) {
-                 setOnboardingCompleted(false);
+                 // If doc doesn't exist on server, we might need onboarding
+                 // But let's not reset if we ALREADY think we're onboarded (prevents redirects during sync)
+                 // onboardingCompleted will only be true if Onboarding.tsx or cache set it.
              }
           }
         }, (error) => {
           clearTimeout(timeoutId);
           console.error("Firestore onSnapshot error:", error);
-          if (!hasLocalCache) {
+          // Only reset if we don't have ANY local state AND it's a first load
+          if (!hasLocalCache && !onboardingCompleted) {
              setOnboardingCompleted(false);
           }
           setIsDataLoading(false);

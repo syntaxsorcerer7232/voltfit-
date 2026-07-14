@@ -1,10 +1,11 @@
 {
-  "projectId": "studied-standard-v07pf",
-  "appId": "1:305863598039:web:26e9330189cdd29c3bf592",
-  "apiKey": "AIzaSyAChiPJu5-Vx4hybnuFykoAOlRr_lWhYCw",
-  "authDomain": "studied-standard-v07pf.firebaseapp.com",
+  "projectId": "voltfit-edda1",
+  "appId": "1:278228089620:web:c1c406857500676fe62001",
+  "apiKey": "AIzaSyDZE98YoCWmWjeTbi-9bu68WtTXOuQ99cg",
+  "authDomain": "voltfit-edda1.firebaseapp.com",
   "firestoreDatabaseId": "ai-studio-baf58b80-1d1a-470e-a682-b04d1418dffa",
-  "storageBucket": "studied-standard-v07pf.firebasestorage.app",
-  "messagingSenderId": "305863598039",
-  "measurementId": ""
+  "storageBucket": "voltfit-edda1.firebasestorage.app",
+  "messagingSenderId": "278228089620",
+  "measurementId": "",
+  "oAuthClientId": "278228089620-jqftdjfbcgl0qega5ltpcdcug0m4nmiq.apps.googleusercontent.com"
 }

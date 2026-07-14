@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { db } from '../lib/firebase';
+import { db, isFirebaseConfigured } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, getAggregateFromServer, count } from 'firebase/firestore';
 import { UserProfile } from '../types';
 import { Trophy, Medal, Award, Users } from 'lucide-react';
@@ -39,7 +39,7 @@ export default React.memo(function Leaderboard({ currentUserId }: { currentUserI
     const [totalUsers, setTotalUsers] = useState<number | null>(null);
 
     useEffect(() => {
-        if (!currentUserId) {
+        if (!isFirebaseConfigured || !currentUserId) {
             setLoading(false);
             return;
         }

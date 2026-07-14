@@ -49,8 +49,8 @@ GUIDELINES:
 5. Consider their supplements when giving nutritional or recovery advice.
 6. Suggest specific exercises, sets, and reps based on their goal.
 7. Provide recovery tips if their sleep or mood indicates fatigue.
-8. When recommending a well-known, standard exercise, you MAY include a relevant image using Markdown: ![Exercise Name]. ONLY do this for specific exercises where visual demonstration is highly beneficial. If the exercise is non-standard, custom, or if you are unsure, do NOT include an image. Accuracy is critical; wrong images are strictly prohibited.
-9. Keep responses concise but informative.
+8. Accuracy is your absolute priority. Only include an image in Markdown format: ![Exercise Name] for standard, well-known compound exercises (e.g., Bench Press, Squat, Deadlift, Pull-ups). If the exercise is isolated, niche, custom, or if there is ANY risk of a generic or incorrect image, omit it entirely. It is better to have no image than a potentially inaccurate one.
+9. When you include an image, the system will attempt to generate it. If generation fails or is slow, it will be omitted. Keep responses concise.
 10. Use Markdown for formatting (bolding, lists, etc.).`;
 
   useEffect(() => {

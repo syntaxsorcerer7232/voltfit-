@@ -42,7 +42,7 @@ export default function AIRecommendations({ activeFocus }: { activeFocus: string
     };
 
     fetchRecommendations();
-  }, [activeFocus, workoutHistory]);
+  }, [activeFocus, workoutHistory?.length]);
 
   const handleAddSupplement = () => {
     if (!newSupplement.trim()) return;
